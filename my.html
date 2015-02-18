@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+    <script>
+    $(document).ready( function() {
+    "use strict";
+
+        // Function that will handle the arrival of the message with the score
+        // if you use postMessage, you can access the data ONLY if you
+        // access it via originalEvent property of the event object.
+    function showResult(event){
+        // There also can be check whether the type of the data received is
+        // "score" though assessing event.originalEvent.data.messageType == "SCORE":
+        $("#iframe_output").text(event.originalEvent.data.score)
+    }
+        // Register Event Handler
+        $(window).on('message', null, showResult)
+  });
+    </script>
+    <title></title>
+</head>
+<body>
+    <IFRAME SRC="example_game_for_project.html" WIDTH=550 HEIGHT=300 NAME="Game">
+        If you can see this, your browser doesn't
+        understand IFRAME.  However, we'll still
+        <A HREF="hello.html">link</A>
+        you to the file.
+    </IFRAME>
+    <hr> The output must be below:
+    <p id="iframe_output"></p>
+    <hr>
+</body>
+</html>

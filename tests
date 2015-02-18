@@ -1,0 +1,61 @@
+import securities as sc
+#import strategies as st
+import importlib
+importlib.reload(sc)
+#importlib.reload(st)
+import time as tm
+from datetime import datetime as dt
+import datahandler as dh
+importlib.reload(dh)
+
+tutu = tm.strftime("%Y-%m-%d")
+print(type(tutu))
+print(dt.today().date())
+
+# Parsing is needed?
+#dh.parse_excel("G:\\usr\\local\\py\\Bloomberg_DataExcel_Individual.xlsx", "G:\\usr\\local\\py")
+
+
+
+#
+#somestock=sc.Stock("IBM")
+#
+#strat = st.BasicMR(somestock)
+#print("ssssS")
+#pp=st.BasicMR.test_stationary(somestock,60)
+#print(pp)
+#print(type(pp))
+
+
+
+
+
+
+#print(somestock.fill_history())
+#temp = somestock.get_prices()
+#print(temp[-10:])
+#temp2 = somestock.get_history(5)
+#print(temp2['Date'][2])
+#if temp2 == '2015-01-14':
+ #   print("Haha")
+#print("\n\n", temp2)
+#print(type(temp))
+#print(temp.index)
+#print(temp.values)
+#print(temp)
+#print(somestock.get_current_date())
+#print(somestock.get_current_price())
+#print(somestock.get_history())
+#trial=Stock("GOOG","G:\\usr\\local\\py\\bloomberg\\Trial_Data.csv")
+#douche=trial.fillHistory()
+#print(douche[1:4])
+#t = pd.DataFrame(data={"hello","here"}, )
+#joke = pd.read_csv("http://chart.yahoo.com/table.csv?s=IBM")
+#print(joke.iloc[:, 0:3])
+#print(joke['Date'])
+#joke2 = pd.DataFrame(joke.iloc[0:, 0], joke["Close"], columns=['Date', 'Close'])
+#print(joke2.index)
+#varia="Date"#
+#print(joke.iloc[2])
+#
+#print(joke2)
