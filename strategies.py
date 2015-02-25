@@ -5,15 +5,18 @@ import numpy as np
 import pandas as pd
 import statsmodels.tsa.stattools as ts
 import kalman as ka
+import johansen as jn
 
 
 class BasicMR(Strategy):
-    """Mean Reversion Strategy for one security with Bollinger Bands."""
+    """Mean Reversion Strategy for one security with Bollinger Bands.
+    If many securities supplied, it analyzes Mean Reversion for every single stock."""
 
-    def __init__(self, security, lookback=30):
-        self.__securities = []
-        self.__securities = security   # it could be either one security or a list of security objects
-        self.__positions = self.generate_positions()
+    def __init__(self, security, lookback=30, max_hold_period=40):
+        self._securities = []
+        self._securities = security   # it could be either one security or a list of security objects
+        print("sef_securities :{}".format(self._securities))
+        self.__positions = self.generate_positions(False, lookback, max_hold_period)
 
     def test_stationary(self, lb=30):
         """ Method checks the stationarity of the price series.
@@ -25,15 +28,29 @@ class BasicMR(Strategy):
             (Note also that the order of the results (indexes) are the same as the indexes for the list of
             securities contained in the current class object. It's a hint for you to know how to find security names for
             True results)."""
-        if not isinstance(self.__securities, list):
-            securities = [self.__securities]
+        if not isinstance(self._securities, list):
+            securities = [self._securities]
         else:
-            securities = self.__securities
-        prices = [one_stock.get_prices(lb) for one_stock in securities]  # list comprehension
-        results = [ts.adfuller(price_series, regression="c", autolag='AIC') for price_series in prices]
-        simple_results = [BasicMR.simplify_adf_results(result[1], result[0], result[4]) for result in results]
+            securities = self._securities
+        prices = []
+        print(lb)
+        lol=securities[0].get_prices(lb)
+        print(type(lol))
+        print(lol)
+        for j in range(0, len(securities)):
+            tmp = securities[j].get_prices(lb)
+            print("tmp:{}".format(tmp))
+            prices.append(tmp)
+        print("Type of prices:{}".format(type(prices)))
+        print("Prices:{}".format(prices[:]))
+        results = []
+        for price_series in prices:
+            print(price_series)
+            tmp = ts.adfuller(price_series, regression="c", autolag='AIC')
+            results.append(tmp)
+        simple_results = [BasicMR.simplify_adf_results(result[1], result[0], float(result[4]['5%'])) for result in results]
         if len(simple_results) == 1:
-            return simple_results[0]
+            return simple_results
         else:
             return simple_results
 
@@ -53,15 +70,15 @@ class BasicMR(Strategy):
     def replace_securities(self, security):
         """Accepts a security that replaces current security for which this Mean Reversion strategy makes analysis.
         They can be accepted as list too."""
-        self.__securities = security
+        self._securities = security
 
     def get_securities_names(self):
         """Returns the stored security's name.
         If there are many securities (in a list), returns a list of names."""
-        if not isinstance(self.__securities, list):
-            return self.__securities.get_name()
+        if not isinstance(self._securities, list):
+            return self._securities.get_name()
         else:
-            return [one_security.get_name() for one_security in self.__securities]
+            return [one_security.get_name() for one_security in self._securities]
 
     #@classmethod
     #def moving_average(cls, data_series, window):
@@ -115,7 +132,7 @@ class BasicMR(Strategy):
         The lower the returned value below 0, the stronger is the downward trend, thus it makes sense to enter
         only short positions. It assumes daily prices.
         Returns float type of slope."""
-        slope = (price_series[-1] - price_series[0]) / len(price_series)
+        slope = (price_series[len(price_series)-1] - price_series[0]) / len(price_series)
         return slope
 
     def generate_positions(self, long_only=False, time_frame=20, max_holding_period = 20):
@@ -125,22 +142,27 @@ class BasicMR(Strategy):
         Time Frame parameter sets look back period for stationarity check and bollinger bands. Default is 20."""
         result = []
         names = []
-        if isinstance(self.__securities, list):
-            securities_list = self.__securities
+        print("Count: 1")
+        print(long_only)
+        if isinstance(self._securities, list):
+            securities_list = self._securities
         else:
-            securities_list = [ self.__securities ]
+            securities_list = [ self._securities ]
+        stationarity_checked_securities = []
         stationarity_checked_securities = self.test_stationary(time_frame)
         index = 0
         for stat_result in stationarity_checked_securities:
             if stat_result == 0:
                 names.append(securities_list[index].get_name())
                 result.append(0)
+                index += 1
                 continue
             this_slope = BasicMR.get_slope(securities_list[index].get_prices(time_frame*4))  # longer-term slope check
             half_life = BasicMR.get_half_life(securities_list[index].get_prices())
             if (half_life is False) or (half_life > max_holding_period):
                 names.append(securities_list[index].get_name())
                 result.append(0)
+                index += 1
                 continue
             # Here we have only good candidates
             mov_avg = BasicMR.kalman_average(securities_list[index].get_prices())
@@ -152,11 +174,17 @@ class BasicMR(Strategy):
                 result.append(1)
             elif this_slope < -0.4 and securities_list[index].get_prices()[-1] > top_band[-1]:
                 names.append(securities_list[index].get_name())
-                result.append(-1)
+                if long_only is False:
+                    result.append(-1)
+                else:
+                    result.append(0)  # We give no recommendation when see short selling signal if long only set to True
             else:
                 names.append(securities_list[index].get_name())
                 result.append(0)
             index += 1
+        print(names)
+        print("------ result:")
+        print(result)
         return [names, result]
 
     @classmethod
@@ -178,7 +206,7 @@ class BasicMR(Strategy):
       #  If the result is < 0.5 => Mean-Reversion;
       #  0.5 => random walk;
       #  > 0.5 => a trend"""
-      #  p = self.__securities.get_prices()
+      #  p = self._securities.get_prices()
       #  tau = []
       #  lagvec = []
       #  #  Step through the different lags
@@ -198,3 +226,52 @@ class BasicMR(Strategy):
     def get_positions(self):
         """Returns a list of positions that have been generated a while ago (not now)."""
         return self.__positions
+
+class LongBasicMR(BasicMR):
+    """The same thing as Basic Mean reversion class, but for simplicity, the instances of this class will be
+    long only strategies."""
+    def __init__(self, security, lookback=30, max_hold_period=40):
+        super(LongBasicMR, self).__init__(security, lookback, max_hold_period)
+
+    def generate_positions(self, long_only=True, time_frame=20, max_holding_period=40):
+        print("Children's Method Called! Yey!")
+        long_only = True
+        return BasicMR.generate_positions(self, long_only, time_frame, max_holding_period)
+
+class Cointegration(BasicMR):
+    """ Class that implements trading strategy based on Johansen test of cointegration."""
+
+    def __init__(self, securities_list, lookback=30, max_hold_period=40):
+        super(Cointegration, self).__init__(securities_list, lookback, max_hold_period)
+
+    def generate_positions(self, long_only=False, time_frame=20, max_holding_period=40):
+        """Method builds best combination of positions that you can access with get_positions.
+        Returns True if they were generated and False if there is no way they can be generated (no stationarity) or
+        on error.
+        Time Frame parameter sets look back period for stationarity check and bollinger bands. Default is 20."""
+        result = []
+        names = []
+        securities_list= []
+        print("LENGTH: {}".format(len(self._securities)))
+        if isinstance(self._securities, list):
+            securities_list = self._securities
+        else:
+            raise Exception("Error: for cointegration strategy you have to choose more than one security.")
+        #generate the matrix of price series:
+        prices = []
+        # CHECK ALL THE DATES OF PRICES ARE THE SAME
+        for i in range(0, len(securities_list)-1):
+            print("YYYYEEEAH: {}".format(securities_list[i]))
+            tmp = securities_list[i]
+            print("I:{}".format(i))
+            prices.append(tmp.get_prices(time_frame))
+        ppp = prices[0][-1]
+
+
+        price_matrix = np.matrix(prices)
+        print(price_matrix.shape)
+        print(price_matrix[0,:])
+        res = jn.coint_johansen(price_matrix, 0, 1)
+        print(res)
+        return ["AAPL", 0]
+

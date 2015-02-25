@@ -20,6 +20,7 @@ import matplotlib
 import math
 import numpy as np
 import matplotlib.dates as mdates
+import analysis as an
 
 import urllib
 
@@ -62,6 +63,16 @@ class MyGui(Ui_MainWindow, QMainWindow):
         self.selected_strategy_index = 0
         self.stock_names = []
         self.actionExit.triggered.connect(self.close)
+        self.checkBox_long = QtGui.QCheckBox(self.groupBox_2)
+        self.checkBox_long.setGeometry(QtCore.QRect(30, 90, 20, 20))
+        self.label_check_1 = QtGui.QLabel(self.groupBox_2)
+        self.label_check_1.setGeometry(QtCore.QRect(50, 90, 60, 20))
+        self.label_check_1.setText("Long only")
+        self.checkBox_two_entries = QtGui.QCheckBox(self.groupBox_2)
+        self.checkBox_two_entries.setGeometry(QtCore.QRect(180, 90, 20, 20))
+        self.label_check_2 = QtGui.QLabel(self.groupBox_2)
+        self.label_check_2.setGeometry(QtCore.QRect(200, 90, 80, 20))
+        self.label_check_2.setText("Two entries")
 
     def close(self):
         QtCore.QCoreApplication.instance().quit()
@@ -137,6 +148,7 @@ class MyGui(Ui_MainWindow, QMainWindow):
         initial_win_size_width = self.groupBox.geometry().width() + 15
         initial_win_size_height = self.groupBox.geometry().height() + self.progressBar.geometry().height() + 20
         initial_win_size_height += self.outputScreen.geometry().height() + 5
+        #print(initial_win_size_width, initial_win_size_height)
         self.setFixedSize(initial_win_size_width, initial_win_size_height)
         self.progressBar.setGeometry(QtCore.QRect(10, self.groupBox.geometry().bottom()-45, 445, 20))
         self.outputScreen.setGeometry(QtCore.QRect(10, self.groupBox.geometry().bottom()+5, 451, 40))
@@ -146,18 +158,21 @@ class MyGui(Ui_MainWindow, QMainWindow):
         #self.nextButton.setEnabled(False)
 
     def window2(self):
-        self.groupBox_2.setGeometry(QtCore.QRect(10, 10, 460, 255))
-        self.outputScreen.setGeometry(QtCore.QRect(10, self.groupBox_2.geometry().bottom()+5, 460, 40))
-        self.setFixedSize(480, 385)
+        self.groupBox_2.setGeometry(QtCore.QRect(10, 10, 460, 285))
+        self.setFixedSize(480, 415)
         self.csvLoad.setGeometry(QtCore.QRect(320, 210, 35, 24))
         self.csvLoad.setText("")
         self.csvLoad.setIcon(QtGui.QIcon("G:\\usr\\local\py\\bloomberg\\open.png"))
-        self.pushButton_2.setGeometry(QtCore.QRect(395, self.outputScreen.geometry().bottom()+5, 75, 23))
         self.strategyComboBox.setGeometry(QtCore.QRect(20, 50, 380, 24))
+        self.label_5.setGeometry(QtCore.QRect(20, 220, 101, 16))
+        self.lineEdit.setGeometry(QtCore.QRect(20, 240, 281, 24))
+        self.csvLoad.setGeometry(QtCore.QRect(320, 240, 75, 23))
+        self.outputScreen.setGeometry(QtCore.QRect(10, self.groupBox_2.geometry().bottom()+5, 460, 40))
+        self.pushButton_2.setGeometry(QtCore.QRect(395, self.outputScreen.geometry().bottom()+5, 75, 23))
         strategies = self.__model.get_strategies()
         self.strategyComboBox.addItems(strategies)
         self.more_button.setVisible(True)
-        self.lineEdit.setGeometry(QtCore.QRect(20, 210, 281, 24))
+        self.groupBox_3.setGeometry(QtCore.QRect(20, 120, 411, 81))
         self.lineEdit.setPlaceholderText("No file loaded")
         self.lineEdit.setText("")
         self.radioButton.setText("Don't fill in missing values")
@@ -203,10 +218,16 @@ class MyGui(Ui_MainWindow, QMainWindow):
         list_sec = self.date_form.listWidget.selectedItems()
         for i in range(0, len(list_sec)):
             list_sec[i] = list_sec[i].text()   # contains a list of names of selected assets
-            print("The text on that element is {}".format(list_sec[i]))
-        results = self.__model.create_strategy(self.strategyComboBox.currentIndex(), list_sec, self.lineEdit.text())
-        for item in results:
-            print(item)
+        results = self.__model.create_strategy(self.strategyComboBox.currentIndex(), list_sec, self.lineEdit.text()) # WHAT IF ITS EMPTY? IT CAUSES AN ERROR!
+        self.analysisDialog = AnalysisDialog(self)
+        text_2_show = ""
+        text_2_show += "The results of the analysis of {} securities:\n".format(len(results[0]))
+        text_2_show += "The strategy is: {}\n".format(self.strategyComboBox.currentText())
+        text_2_show += "To implement this strategy you should enter the following positions:\n"
+        for j in range(0, len(results[0])):
+            text_2_show += "{}: {}\n".format(results[0][j], results[1][j])
+        self.analysisDialog.output.setText(text_2_show)
+        self.analysisDialog.show()
 
 
     def from3_to_win2(self):
@@ -272,10 +293,13 @@ class DateForm(Ui_Form, QtGui.QWidget):
         self.add_button.setGeometry(QtCore.QRect(85, 30, 26, 24))
         self.add_button.setIcon(QtGui.QIcon("G:\\usr\\local\py\\bloomberg\\add.png"))
         self.add_button.clicked.connect(self.add_to_list)
+        self.lineEdit.returnPressed.connect(self.add_to_list)
         self.dateEdit_2.setDate(QDate.currentDate())
         self.lineEdit.setObjectName(gui._fromUtf8("add_button"))
         self.spinDateBox.setDisplayFormat("MMMM")
         self.__csv_file = None
+
+
 
     def setCsv(self, filename):
         self.__csv_file = filename
@@ -679,3 +703,18 @@ class WorkThread(QtCore.QThread):
         time.sleep(0.1)   # artificial time delay
         self.__function(self.__args[0][0], self.__args[0][1], self.__args[0][2])
         self.terminate()
+
+class AnalysisDialog(an.Ui_Form, QDialog):
+    def __init__(self, parent=MyGui):
+        super(AnalysisDialog, self).__init__(parent)
+        self.setupUi(self)
+        self.closeButton.clicked.connect(self.hide)
+        self.chartButton.clicked.connect(self.showCharts)
+
+    def hide(self):
+        self.output.setText("")
+        self.setVisible(False)
+
+    def showCharts(self):
+        """Not implemented yet!"""
+        raise NotImplementedError("Error: this function is not implemented yet!")

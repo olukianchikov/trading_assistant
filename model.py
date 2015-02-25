@@ -140,5 +140,14 @@ class Model:
         for sec in list_sec_names:
             list_sec.append(sc.Stock(sec, hfile))
         if int_strategy is 0:
+            """Mean reversion with Bollinger Bands"""
             mr_strategy = st.BasicMR(list_sec)
-        return mr_strategy.get_positions()
+            return mr_strategy.get_positions()          # Will return list of lists: [names, results]
+        elif int_strategy is 1:
+            """MR with Bollinger Bands but long only"""
+            long_mr_strategy = st.LongBasicMR(list_sec)
+            return long_mr_strategy.get_positions()
+        elif int_strategy is 2:
+            coint = st.Cointegration(list_sec)
+            return coint.get_positions()
+

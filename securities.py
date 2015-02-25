@@ -24,6 +24,8 @@ class Stock(Security):
         self.__price = None
         self.__history_file = None
         try:
+            if history_file is "":
+                history_file = None
             if history_file is not None:
                 if Stock.check_file(history_file):
                     self.__history_file = history_file
@@ -31,7 +33,6 @@ class Stock(Security):
                 else:
                     self.__history = None
                     self.__history_file= None
-                    raise WrongHistoryFileError("The file you provided is not found or other error occurred.")
             else:
                 self.fill_history()
                 self.__history_file = None
@@ -180,8 +181,13 @@ class Stock(Security):
         """Returns the series of prices. By default, returns the prices for the whole period stored in the instance.
         You can set a parameter which means prices of how many last days to return."""
         if isinstance(self.__history, pd.core.frame.DataFrame):
+            print("Yes it is data frame!")
             if (time_frame != None):
-                return pd.Series(self.__history[self.__name])[-time_frame:]
+                k = pd.Series(self.__history[self.__name])[-time_frame:]
+                print(type(k))
+                print(k)
+                print("___________")
+                return k
             else:
                 return pd.Series(self.__history[self.__name])
 

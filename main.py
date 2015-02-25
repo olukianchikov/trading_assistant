@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 
 def main(args):
     app = QtGui.QApplication(args)
+    _Font = QtGui.QFont("Tahoma", 8);
+    QtGui.QApplication.setFont(_Font);
     w = mygui.MyGui()
     w.show()
     sys.exit(app.exec_())
