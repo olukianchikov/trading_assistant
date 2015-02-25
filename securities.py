@@ -56,36 +56,30 @@ class Stock(Security):
         it is possible for Yahoo Finance not to have the data on that stock, thus the update wouldn't be successful.
         If a file with multiple securities passed, the method will take the dates and the prices columns where the price
         must have the column name exactly the same as security's name."""
-        try:
-            if hfile is not None:
-                if os.path.isfile(hfile):
-                    f = pd.read_csv(hfile)
-                else:
-                    raise Exception("The file supplemented can't be found.")
+        if hfile is not None:
+            if os.path.isfile(hfile):
+                f = pd.read_csv(hfile)
             else:
-                if self.__history_file is not None:
-                    # analyze the history file and load prices
-                    f = pd.read_csv(self.__history_file)
-                    # Check with current date that the last record is the last:
-                    f = Stock.finalize_history(f)
-                    #     <- That upper one will return the same f if it's indeed updated/relevant history.
-                    #     Will fill up the remaining part and return complete f otherwise.
-                else:
-                    # load prices from yahoo
-                    f = Stock.fetch_yahoo(self.__name)
-                    if f is False:
-                        raise Exception("Error: cannot retrieve the data from Yahoo Finance.")
-            self.__history = pd.DataFrame(f.iloc[0:, 0], columns=['Date'])  # loaded history it is a list of date
-            # and price
-            self.__history[self.__name] = f[self.__name]
-            self.__date = f.iloc[-1,0]
-            self.__price = f[self.__name].iloc[-1]
-            return True
-        except Exception as e:
-            sys.stderr.write('ERROR: %s\n' % str(e))
-            exc_traceback = sys.exc_info()
-            sys.stderr.write('Traceback: %s\n' % str(exc_traceback))
-            return False
+                raise FileNotFoundError("The file supplemented can't be found.")
+        else:
+            if self.__history_file is not None:
+                # analyze the history file and load prices
+                f = pd.read_csv(self.__history_file)
+                # Check with current date that the last record is the last:
+                f = Stock.finalize_history(f)
+                #     <- That upper one will return the same f if it's indeed updated/relevant history.
+                #     Will fill up the remaining part and return complete f otherwise.
+            else:
+                # load prices from yahoo
+                f = Stock.fetch_yahoo(self.__name)
+                if f is False:
+                    raise ValueError("Error: cannot retrieve the data from Yahoo Finance for {}.".format(self.__name))
+        self.__history = pd.DataFrame(f.iloc[0:, 0], columns=['Date'])  # loaded history it is a list of date
+        # and price
+        self.__history[self.__name] = f[self.__name]
+        self.__date = f.iloc[-1,0]
+        self.__price = f[self.__name].iloc[-1]
+        return True
 
     @classmethod
     def fetch_yahoo(cls, name):
@@ -129,14 +123,11 @@ class Stock(Security):
         else:
             return self.fill_history(self)
 
-    def get_history(self, time_frame=None):
+    def get_history(self, beg, end):
         """Returns the data frame of dates and prices."""
         try:
             if isinstance(self.__history, pd.core.frame.DataFrame):
-                if time_frame is not None:
-                    return self.__history[-time_frame:]
-                else:
-                    return self.__history
+                return self.__history[:][(self.__history["Date"] >= beg) & (self.__history["Date"] <= end)]
             else:
                 raise Exception("The history data frame does not exist internally in this instance.")
         except Exception as e:
@@ -177,19 +168,28 @@ class Stock(Security):
         """Returns a string containing of name of the stock of the object."""
         return self.__name
 
-    def get_prices(self, time_frame=None):
+    def get_prices(self, beg, end):
         """Returns the series of prices. By default, returns the prices for the whole period stored in the instance.
         You can set a parameter which means prices of how many last days to return."""
         if isinstance(self.__history, pd.core.frame.DataFrame):
-            print("Yes it is data frame!")
-            if (time_frame != None):
-                k = pd.Series(self.__history[self.__name])[-time_frame:]
-                print(type(k))
-                print(k)
-                print("___________")
-                return k
-            else:
-                return pd.Series(self.__history[self.__name])
+            prices = []
+            for index, row in self.__history.iterrows():
+                if (dt.strptime(self.__history["Date"][index], "%Y-%m-%d").date() >= beg)&\
+                (dt.strptime(self.__history["Date"][index], "%Y-%m-%d").date() <= end):
+                    prices.append(self.__history[self.__name][index])
+            k = pd.Series(prices)
+            return k
+
+    def get_dates(self, beg, end):
+        if isinstance(self.__history, pd.core.frame.DataFrame):
+            dates = []
+            for index, row in self.__history.iterrows():
+                if (dt.strptime(self.__history["Date"][index], "%Y-%m-%d").date() >= beg)&\
+                (dt.strptime(self.__history["Date"][index], "%Y-%m-%d").date() <= end):
+                    dates.append(self.__history["Date"][index])
+            k = pd.Series(dates)
+            return k
+
 
 
 class ETF(Stock):

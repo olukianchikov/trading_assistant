@@ -12,14 +12,19 @@ import numpy as np
 import datetime
 
 class Model:
-
+    """
+    When it comes to strategy indexes, they must be the following:
+    0 - MR with BB
+    1 - MR with BB: long only
+    2 - MR with BB and two entries
+    3 - MR with BB and two entries: long only
+    4 - Pair Trading
+    5 - Index Arbitrage
+    6 - Cointegration
+    """
     def __init__(self):
         self.parser = None
-        self.strategies = ['Mean Reversion with Bollinger Bands', 'Mean Reversion with Bollinger Bands: Long Only',
-            'Mean Reversion with Bollinger Bands and two enty levels',
-                           'Mean Reversion with Bollinger Bands and two entry levels: Long Only',
-                           'Pair Trading', 'Index Arbitrage',
-                            'Cointegration']
+        self.strategies = ['Mean Reversion with Bollinger Bands', 'Pair Trading', 'Index Arbitrage', 'Cointegration']
         self.descriptions = ['It\'s one stock strategy in a way that it tries to find mean reversion in each of specified'
                              'stocks, then it gives you recommendations how to trade them. It uses Bollinger Bands'
                              'with Kalman filter applied to moving average. If you want to find a combination'
@@ -135,19 +140,29 @@ class Model:
         last_date = f.iloc[-1, 0]
         return datetime.datetime.strptime(last_date, '%Y-%m-%d').date()
 
-    def create_strategy(self, int_strategy, list_sec_names, hfile):
+    def create_strategy(self, int_strategy, list_sec_names, beg, end, hfile):
         list_sec = []
         for sec in list_sec_names:
-            list_sec.append(sc.Stock(sec, hfile))
+            k = sc.Stock(sec, hfile)
+            list_sec.append(k)
+        del k
         if int_strategy is 0:
             """Mean reversion with Bollinger Bands"""
-            mr_strategy = st.BasicMR(list_sec)
+            mr_strategy = st.BasicMR(list_sec, beg, end)
             return mr_strategy.get_positions()          # Will return list of lists: [names, results]
         elif int_strategy is 1:
             """MR with Bollinger Bands but long only"""
-            long_mr_strategy = st.LongBasicMR(list_sec)
+            long_mr_strategy = st.LongBasicMR(list_sec, beg, end)
             return long_mr_strategy.get_positions()
         elif int_strategy is 2:
-            coint = st.Cointegration(list_sec)
+            raise NotImplementedError("Error: MR with BB and two entries is not implemented yet.")
+        elif int_strategy is 3:
+            raise NotImplementedError("Error: MR with BB and two entries: Long only - is not implemented yet.")
+        elif int_strategy is 4:
+            raise NotImplementedError("Error: Pair trading strategy is not implemented yet.")
+        elif int_strategy is 5:
+            raise NotImplementedError("Error: Index Arbitrage strategy is not implemented yet.")
+        elif int_strategy is 6:
+            coint = st.Cointegration(list_sec, beg, end)
             return coint.get_positions()
 

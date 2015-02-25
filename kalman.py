@@ -75,10 +75,3 @@ def kalman(obs=None,mu_init=array([-0.37727]), cov_init=0.1*ones((1)), nsteps=50
 #print(xxx)
 #print(shape(xxx))
 #yyy = xxx[0,:]
-
-#print(shape(yyy))
-somestock=sc.Stock("IBM")
-obs = array([somestock.get_prices(60).values])
-print(type(obs))
-print(shape(obs))
-kalman(obs, nsteps=60)

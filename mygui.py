@@ -73,6 +73,18 @@ class MyGui(Ui_MainWindow, QMainWindow):
         self.label_check_2 = QtGui.QLabel(self.groupBox_2)
         self.label_check_2.setGeometry(QtCore.QRect(200, 90, 80, 20))
         self.label_check_2.setText("Two entries")
+        self.strategyComboBox.currentIndexChanged.connect(self.update_checkboxes)
+
+    def update_checkboxes(self):
+        self.checkBox_two_entries.setChecked(False)
+        self.checkBox_long.setChecked(False)
+        index = self.strategyComboBox.currentIndex()
+        if index in [1, 2, 3]:
+            self.checkBox_long.setEnabled(False)
+            self.checkBox_two_entries.setEnabled(False)
+        else:
+            self.checkBox_long.setEnabled(True)
+            self.checkBox_two_entries.setEnabled(True)
 
     def close(self):
         QtCore.QCoreApplication.instance().quit()
@@ -164,7 +176,7 @@ class MyGui(Ui_MainWindow, QMainWindow):
         self.csvLoad.setText("")
         self.csvLoad.setIcon(QtGui.QIcon("G:\\usr\\local\py\\bloomberg\\open.png"))
         self.strategyComboBox.setGeometry(QtCore.QRect(20, 50, 380, 24))
-        self.label_5.setGeometry(QtCore.QRect(20, 220, 101, 16))
+        self.label_5.setGeometry(QtCore.QRect(20, 220, 141, 16))
         self.lineEdit.setGeometry(QtCore.QRect(20, 240, 281, 24))
         self.csvLoad.setGeometry(QtCore.QRect(320, 240, 75, 23))
         self.outputScreen.setGeometry(QtCore.QRect(10, self.groupBox_2.geometry().bottom()+5, 460, 40))
@@ -187,7 +199,7 @@ class MyGui(Ui_MainWindow, QMainWindow):
         self.stock_names = self.__model.load_names_from_csv(self.lineEdit.text())
         self.date_form = DateForm(self)
         if self.lineEdit.text() is not "":
-            """We have set csv file"""
+            """We have set csv file, now let's set beginning and end dates from the file and also the list of stocks"""
             first_date = self.__model.load_first_date_from_csv(self.lineEdit.text())
             self.date_form.dateEdit.setDate(QDate(first_date.year, first_date.month, first_date.day))
             last_date = self.__model.load_last_date_from_csv(self.lineEdit.text())
@@ -200,11 +212,14 @@ class MyGui(Ui_MainWindow, QMainWindow):
             self.date_form.listWidget.setGeometry(QtCore.QRect(20, 40, 211, 271))
             self.date_form.setCsv(self.lineEdit.text())
         else:
-            """No csv file set. Entering Yahoo Finance mode"""
+            """No csv file set. Entering Yahoo Finance mode. Set arbitrary beginning and end dates."""
             self.date_form.add_button.setVisible(True)
             self.date_form.lineEdit.setVisible(True)
             self.date_form.listWidget.setGeometry(QtCore.QRect(20, 60, 211, 241))
             self.date_form.setCsv(None)
+            first_date = (2013, 1, 1)
+            self.date_form.dateEdit.setDate(QDate(first_date[0], first_date[1], first_date[2]))
+            self.date_form.dateEdit_2.setDate(QDate.currentDate())
         self.date_form.radioButton.setChecked(True)
         self.groupBox_2.hide()
         self.pushButton_2.hide()
@@ -214,29 +229,67 @@ class MyGui(Ui_MainWindow, QMainWindow):
         self.date_form.pushButton.clicked.connect(self.analyze)
         self.setFixedSize(531, 374)
 
+
+    def get_beg_date(self):
+        """Returns the date from "From" date picker in the format of datetime.date"""
+        this_date = self.date_form.dateEdit.date()
+        this_date = this_date.toPyDate()
+        print(this_date)
+        return this_date
+
+    def get_end_date(self):
+        """Returns the date from "To" date picker in the format of datetime.date"""
+        this_date = self.date_form.dateEdit_2.date()
+        this_date = this_date.toPyDate()
+        print(this_date)
+        return this_date
+
     def analyze(self, ffile = None):
         list_sec = self.date_form.listWidget.selectedItems()
+        if len(list_sec) == 0:
+            raise Exception("Error: You haven't provided any securities for the analysis.")
         for i in range(0, len(list_sec)):
             list_sec[i] = list_sec[i].text()   # contains a list of names of selected assets
-        results = self.__model.create_strategy(self.strategyComboBox.currentIndex(), list_sec, self.lineEdit.text()) # WHAT IF ITS EMPTY? IT CAUSES AN ERROR!
+        index = self.strategyComboBox.currentIndex()
+        index = self.get_proper_strategy_index(index)
+        beg = self.get_beg_date()
+        end = self.get_end_date()
+        results = self.__model.create_strategy(index, list_sec, beg, end, self.lineEdit.text())
         self.analysisDialog = AnalysisDialog(self)
         text_2_show = ""
         text_2_show += "The results of the analysis of {} securities:\n".format(len(results[0]))
-        text_2_show += "The strategy is: {}\n".format(self.strategyComboBox.currentText())
+        text_2_show += "The strategy is: {}\n".format(index)
         text_2_show += "To implement this strategy you should enter the following positions:\n"
         for j in range(0, len(results[0])):
             text_2_show += "{}: {}\n".format(results[0][j], results[1][j])
         self.analysisDialog.output.setText(text_2_show)
         self.analysisDialog.show()
 
-
     def from3_to_win2(self):
         self.date_form.hide()
         self.window2()
 
+    def get_proper_strategy_index(self, index_given):
+        initial_index = index_given
+        if initial_index == 0:
+            if self.checkBox_long.isChecked() is True:
+                if self.checkBox_two_entries.isChecked() is True:
+                    index = 3
+                else:
+                    index = 1
+            else:
+                if self.checkBox_two_entries.isChecked() is True:
+                    index = 2
+                else:
+                    index = 0
+        else:
+            index = initial_index + 3
+        return index
+
 
     def display_description(self, index):
          index = self.strategyComboBox.currentIndex()
+         index = self.get_proper_strategy_index(index)
          help = QMessageBox.information(self, "Help", self.__model.get_strategy_descriptions()[index],\
                                         QtGui.QMessageBox.Ok)
 
@@ -245,8 +298,6 @@ class MyGui(Ui_MainWindow, QMainWindow):
                             "Warning",\
                             question, \
                             QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
-        print(type(answer))
-        print(answer)
         return answer
 
     def changeProgressBar(self, value=None):
