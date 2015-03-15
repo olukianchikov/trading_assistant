@@ -248,26 +248,119 @@ class Cointegration(BasicMR):
         result = []
         names = []
         securities_list= []
-        print("LENGTH: {}".format(len(self._securities)))
         if isinstance(self._securities, list):
             securities_list = self._securities
         else:
             raise Exception("Error: for cointegration strategy you have to choose more than one security.")
         #generate the matrix of price series:
         prices = []
-        # CHECK ALL THE DATES OF PRICES ARE THE SAME
-        for i in range(0, len(securities_list)-1):
-            print("YYYYEEEAH: {}".format(securities_list[i]))
+        # CHECK ALL THE DATES OF PRICES ARE THE SAME:
+        for i in range(0, len(securities_list)):
             tmp = securities_list[i]
             print("I:{}".format(i))
-            prices.append(tmp.get_prices(time_frame))
-        ppp = prices[0][-1]
-
-
-        price_matrix = np.matrix(prices)
+            prices.append([ tmp.get_dates(beg_date, end_date), tmp.get_prices(beg_date, end_date)])
+        print(prices[0]) #<<<<<<<<<<<<<<<<<<<<<<<<<<
+        shortest_dates_length = len(prices[0][0])
+        shortest_dates_index = 0
+        max = len(prices)
+        for i in range(1, max):
+            tmp_length = len(prices[i][0])
+            if tmp_length < shortest_dates_length:
+                shortest_dates_length = tmp_length
+                shortest_dates_index = i
+        df = pd.DataFrame({"dates": prices[shortest_dates_index][0], securities_list[shortest_dates_index].get_name(): prices[shortest_dates_index][1]})
+        print("::::::::::::::::::::::::::::::")
+        print(df)
+        for i in range(0, len(securities_list)):
+            print("current i is {}".format(i))
+            print("Name is {}".format(securities_list[i].get_name()))
+            if i == shortest_dates_index:
+                continue
+            df_new = pd.DataFrame({"dates": prices[i][0], securities_list[i].get_name(): prices[i][1]})
+            df = df.merge(df_new, on='dates', how="inner")
+        # NOW df should contain only dates and prices for the shortest period of dates among all the securities...
+        print("..................................................")
+        print(df)
+        # MAYBE RETURN THE BEGINNIG OF ANALYZED PERIOD AND END?
+        extra_output = []
+        extra_output.append("The beginning of the analyzed period is {}".format(df['dates'].irow(0)))
+        extra_output.append("The end of the analyzed period is {}".format(df['dates'].irow(-1)))
+        df = df.drop("dates", axis = 1)
+        price_matrix = df.as_matrix()
         print(price_matrix.shape)
-        print(price_matrix[0,:])
+        print("Price matrix is this:")
+        print(price_matrix)
         res = jn.coint_johansen(price_matrix, 0, 1)
-        print(res)
-        return ["AAPL", 0]
+        """ esult.eig  = eigenvalues  (m x 1)
+%          result.evec = eigenvectors (m x m), where first
+%                        r columns are normalized coint vectors
+%          result.lr1  = likelihood ratio trace statistic for r=0 to m-1
+%                        (m x 1) vector where r is the number of cointegrating combinations, m is the
+                         total number of variables. Remember, if r=m, then all the variables are stationary by
+                         themselves and we do not need cointegration anymore.
+%          result.lr2  = maximum eigenvalue statistic for r=0 to m-1
+%                        (m x 1) vector.
+%          result.cvt  = critical values for trace statistic
+%                        (m x 3) vector [90% 95% 99%]
+                         So each row is given for each test (r=0, r=1, r=2..., r=m-1). And then there are 3 columns for 90, 95 and 99
+%          result.cvm  = critical values for max eigen value statistic
+%                        (m x 3) vector [90% 95% 99%]
+%          result.ind  = index of co-integrating variables ordered by
+%                        size of the eigenvalues from large to small"""
+        print("trace statistic: \n{}".format(res.lr1))
+        print("trace statistic crit values: \n{}".format(res.cvt))
+        print("Eigenvalue statistic: \n{}".format(res.lr2))
+        print("Eigenvalue statistic crit values: \n{}".format(res.cvm))
+        print("Eigenvalues: \n{}".format(res.eig))
+        print("Eigen vectors: \n{}".format(res.evec))
+        names = df.columns.values
+        extra_output.append("\n")
+        extra_output.append("Trace Value statistics:\n {}".format(res.lr1))
+        extra_output.append("Trace Critical Values:\n {}".format(res.cvt))
+        extra_output.append("\n")
+        extra_output.append("Eigen Value statistics:\n {}".format(res.lr2))
+        extra_output.append("Versus Critical Values:\n {}".format(res.cvm))
+        extra_output.append("\n")
+        # Check how many cointegrating combinations there are:
+        num_combinations = 0
+        weights = []
+        for i in range(0, len(res.lr1)):
+            print(res.lr1[i])
+            print(res.cvt[i, 1])
+            print("_____")
+            if res.lr1[i] < res.cvt[i, 1]:    # HAVE TO CHECK WHETHER 1 here is really refer to a column index...
+                num_combinations = i
+                break
+        if num_combinations == 0:
+            for j in range(0, len(names)):
+                weights.append(0)
+            result = [names, weights, extra_output]   # ALSO RETURN TEXT THAT NO COMBINATIONS FOUND??
+        else:
+            #FIND HIGHEST EIGENVALUE AND RETURNS ITS CORRESPONDING COLUMN IN EIGEN VECTORS
+            best_index = 0
+            for i in range(1, len(res.lr2)):
+                if res.lr2[i] > res.cvm[i, 1]:
+                    if res.lr2[i] > res.lr2[best_index]:
+                        best_index = i
+            for j in range(0, len(names)):
+                weights.append(res.evec[j, best_index])
+            # express weights in relation to first security:
+            divisor = weights[0]
+            for j in range(0, len(weights)):
+                weights[j] = weights[j] / divisor
+            #For the half life analysis, I need:
+            price_series = pd.Series()
+            max = len(price_matrix[:, 0])
+            for i in range(0, max):
+                agg_price = 0
+                for k in range(0, len(price_matrix[i, :])):
+                    agg_price = agg_price + price_matrix[i, k] * weights[k]  # Aggregate price of given weights
+                price_series.set_value(i, agg_price)
+            half_life = BasicMR.get_half_life(price_series)
+            extra_output.append("Half life period: {}".format(half_life))
+            result = [names, weights, extra_output]
+        # For further backtesting, add weights and half life to the properties of this object....
+        return result
+
+
 

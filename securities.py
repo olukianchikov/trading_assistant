@@ -177,7 +177,7 @@ class Stock(Security):
                 if (dt.strptime(self.__history["Date"][index], "%Y-%m-%d").date() >= beg)&\
                 (dt.strptime(self.__history["Date"][index], "%Y-%m-%d").date() <= end):
                     prices.append(self.__history[self.__name][index])
-            k = pd.Series(prices)
+            k = pd.Series(prices, name=self.__name)
             return k
 
     def get_dates(self, beg, end):

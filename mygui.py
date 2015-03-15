@@ -255,6 +255,7 @@ class MyGui(Ui_MainWindow, QMainWindow):
         beg = self.get_beg_date()
         end = self.get_end_date()
         results = self.__model.create_strategy(index, list_sec, beg, end, self.lineEdit.text())
+        money = MaxSumQuestionBox.get_money(self)
         self.analysisDialog = AnalysisDialog(self)
         text_2_show = ""
         text_2_show += "The results of the analysis of {} securities:\n".format(len(results[0]))
@@ -262,6 +263,24 @@ class MyGui(Ui_MainWindow, QMainWindow):
         text_2_show += "To implement this strategy you should enter the following positions:\n"
         for j in range(0, len(results[0])):
             text_2_show += "{}: {}\n".format(results[0][j], results[1][j])
+        text_2_show += "\nOr if you want to invest {} dollars, you should spend:\n".format(money)
+        # Sum all the weights and devide the money variable by that sum to see how much to invest in first security:
+        summ = 0
+        for j in range(0, len(results[1])):
+            print(results[1][j])
+            summ = summ + results[1][j]
+        if summ == 0:
+            # All the weights are zero:
+            x_invest = 0
+        else:
+            x_invest = money / summ
+        for j in range(0, len(results[0])):
+            how_much = results[1][j] * x_invest
+            how_much = round(how_much, 0)
+            text_2_show += "{}: {} dollars\n".format(results[0][j], how_much)
+        text_2_show += "\n"
+        for j in range(0, len(results[2])):
+            text_2_show += "{}\n".format(results[2][j])
         self.analysisDialog.output.setText(text_2_show)
         self.analysisDialog.show()
 
@@ -317,6 +336,38 @@ class MyGui(Ui_MainWindow, QMainWindow):
             self.nextButton.setEnabled(False)
             self.pushButton.setEnabled(True)
             self.bigDataLoad.setEnabled(False)
+
+class MaxSumQuestionBox(QDialog):
+    def __init__(self, parent=MyGui):
+        super(MaxSumQuestionBox, self).__init__(parent)
+        self.setFixedSize(500, 300)
+        self.label_3 = QtGui.QLabel(self)
+        self.label_3.setGeometry(QtCore.QRect(10, 20, 421, 61))
+        self.label_3.setWordWrap(True)
+        self.label_3.setText("Choose how much money you want to allocate into this portfolio (in thousands USD):")
+        self.text_input = QtGui.QSpinBox(self)
+        self.text_input.setGeometry(QtCore.QRect(10, 100, 90, 30))
+        self.text_input.setMaximum(1000000)
+        self.text_input.setMinimum(1)
+        self.text_input.setValue(100)
+        self.ok = QtGui.QPushButton(self)
+        self.ok.setGeometry(QtCore.QRect(40, 180, 40, 27))
+        self.ok.setText("Ok")
+        self.ok.clicked.connect(self.set_amount)
+
+    def set_amount(self):
+        self.__amount = self.text_input.value() * 1000
+        self.accept()
+
+    def get_amount(self):
+        return self.__amount
+
+    @staticmethod
+    def get_money(parent = None):
+        dialog = MaxSumQuestionBox(parent)
+        if dialog.exec_():
+            amount = dialog.get_amount()
+            return amount
 
 class DateForm(Ui_Form, QtGui.QWidget):
     def __init__(self, parent=MyGui):
